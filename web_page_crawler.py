@@ -1,7 +1,10 @@
+
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, urljoin
 import re
+import time
+import random
 
 
 # 定义一个函数来获取页面内容
@@ -11,7 +14,7 @@ def get_page(url):
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
                           'Chrome/58.0.3029.110 Safari/537.3'
         }
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, timeout=5)
         response.raise_for_status()  # 确保响应成功
         return response.text
     except Exception as e:
@@ -76,6 +79,9 @@ def web_crawler(start_url, internal_pages_visited_max, internal_links_filename='
     internal_pages_count = 0
     internal_links_written = set()  # 用于记录已经写入文件的内部链接
 
+    # 提取主域名
+    main_domain = '.'.join(urlparse(start_url).netloc.split('.')[-2:])
+
     internal_links_file = open(internal_links_filename, 'w', encoding='utf-8')
     external_links_file = open(external_links_filename, 'w', encoding='utf-8')
 
@@ -93,14 +99,19 @@ def web_crawler(start_url, internal_pages_visited_max, internal_links_filename='
             external_resources_count += len(ext_res)
             file_links_count += len(files)
 
+            delay = random.uniform(0.03, 0.15)  # 生成0到0.5秒之间的随机延迟
+            time.sleep(delay)  # 暂停程序的执行一段时间
+
             for link in links:
                 link_domain = urlparse(link).netloc
+                link_domain_suffix = '.'.join(link_domain.split('.')[-2:])
+                is_internal_domain = main_domain.endswith(link_domain_suffix)
+                # 判断是否是页面链接（排除资源文件）
                 is_page_link = not bool(re.search(
                     r'\.(jpg|jpeg|png|gif|bmp|ico|svg|css|js|pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|7z)(\?.*)?(#.*)?$',
                     link))
 
-                if (link_domain == internal_domain and is_page_link and link not in to_visit
-                        and link not in internal_links_written):
+                if is_internal_domain and is_page_link and link not in to_visit and link not in internal_links_written:
                     to_visit.add(link)
                     internal_links_file.write(link + '\n')  # 将内部页面链接写入文件
                     internal_links_written.add(link)  # 记录已写入的链接
@@ -118,3 +129,11 @@ def web_crawler(start_url, internal_pages_visited_max, internal_links_filename='
     print("Total Links Collected:", all_links_count)
     print("External Resources:", external_resources_count)
     print("Unique doc/docx/pdf files:", file_links_count)
+
+
+start_url = 'https://270.msu.ru/'
+start_time = time.time()  # 获取当前时间
+web_crawler(start_url, 100)
+end_time = time.time()  # 再次获取当前时间
+print("程序运行时间: ", end_time - start_time, "秒")  # 计算并打印运行时间
+
